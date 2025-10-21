@@ -1166,28 +1166,35 @@ def logout():
 
 @app.route('/init_whatsapp_bot', methods=['POST'])
 def init_whatsapp_bot():
-    """Initialize WhatsApp bot for user and get QR code"""
+    """Initialize WhatsApp bot with proper error handling"""
     if 'user_id' not in session:
         return jsonify({'error': 'Not logged in'})
     
     user_id = session['user_id']
     
     try:
-        # In a real implementation, this would call your Node.js bot service
-        # For now, we'll simulate the bot initialization
-        # You would typically make an HTTP request to your Node.js bot here
+        # Call Node.js service to initialize bot
+        bot_service_url = os.environ.get('NODE_SERVICE_URL', 'http://localhost:3000')
+        response = requests.post(f'{bot_service_url}/init', json={
+            'user_id': user_id
+        }, timeout=30)
         
-        # Mark user's WhatsApp as ready (in real implementation, this would happen after QR scan)
-        db.update_whatsapp_status(user_id, False)  # Set to false until QR is scanned
-        
+        if response.status_code == 200:
+            return jsonify({
+                'success': True, 
+                'message': 'WhatsApp bot initialization started'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Node.js service unavailable'
+            })
+            
+    except requests.exceptions.RequestException as e:
         return jsonify({
-            'success': True, 
-            'message': 'WhatsApp bot initialization started. QR code will be generated shortly.'
+            'success': False,
+            'error': f'Cannot connect to WhatsApp bot service: {str(e)}'
         })
-        
-    except Exception as e:
-        print(f"Error initializing WhatsApp bot: {e}")
-        return jsonify({'error': 'Failed to initialize WhatsApp bot'})
 
 @app.route('/get_qr_code')
 def get_qr_code():
@@ -1204,15 +1211,25 @@ def get_qr_code():
 
 @app.route('/whatsapp_status')
 def whatsapp_status():
-    """Check WhatsApp connection status"""
+    """Check WhatsApp connection status with better error handling"""
     if 'user_id' not in session:
         return jsonify({'error': 'Not logged in'})
     
     user_id = session['user_id']
+    
+    try:
+        # Check if Node.js service is available
+        bot_service_url = os.environ.get('NODE_SERVICE_URL', 'http://localhost:3000')
+        response = requests.get(f'{bot_service_url}/health', timeout=5)
+        service_healthy = response.status_code == 200
+    except:
+        service_healthy = False
+    
     user_data = db.get_user(user_id)
     
     return jsonify({
         'connected': user_data['whatsapp_ready'] if user_data else False,
+        'service_healthy': service_healthy,
         'status': 'connected' if user_data and user_data['whatsapp_ready'] else 'disconnected'
     })
 

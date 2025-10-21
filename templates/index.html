@@ -1215,6 +1215,121 @@
                 .then(orders => updateOrdersDisplay(orders))
                 .catch(error => console.error('Error loading initial orders:', error));
         }
+        async function initializeUserWhatsAppBot() {
+            if (!userEmail || !sessionId) {
+                showError('Usuário não identificado. Faça login novamente.');
+                return;
+            }
+        
+            try {
+                showUserLoadingState();
+                
+                const response = await fetch('/api/init_user_bot', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id: sessionId })
+                });
+                
+                if (response.ok) {
+                    startUserQRPolling();
+                } else {
+                    throw new Error('Failed to initialize user bot');
+                }
+            } catch (error) {
+                showError('Erro ao conectar com WhatsApp: ' + error.message);
+            }
+        }
+        
+        async function checkUserBotStatus() {
+            try {
+                const response = await fetch('/api/user_bot_status');
+                const status = await response.json();
+                
+                if (status.connected) {
+                    showDashboard();
+                } else if (status.has_qr && status.qr_code) {
+                    displayUserQRCode(status.qr_code);
+                } else if (status.has_qr) {
+                    showUserWaitingState();
+                } else {
+                    showUserReadyToConnect();
+                }
+            } catch (error) {
+                showError('Erro ao verificar status do WhatsApp');
+            }
+        }
+        
+        function startUserQRPolling() {
+            setInterval(checkUserBotStatus, 3000);
+        }
+        
+        function showUserLoadingState() {
+            document.getElementById('qrCode').innerHTML = `
+                <div style="text-align: center; padding: 20px;">
+                    <p>🔄 Iniciando seu WhatsApp...</p>
+                    <div class="loading-spinner"></div>
+                    <p><small>Preparando conexão pessoal</small></p>
+                </div>
+            `;
+        }
+        
+        function showUserWaitingState() {
+            document.getElementById('qrCode').innerHTML = `
+                <div style="text-align: center; padding: 20px;">
+                    <p>⏳ Gerando seu QR Code pessoal...</p>
+                    <div class="loading-spinner"></div>
+                    <p><small>Aguarde alguns segundos</small></p>
+                </div>
+            `;
+        }
+        
+        function showUserReadyToConnect() {
+            document.getElementById('qrCode').innerHTML = `
+                <div style="text-align: center; padding: 20px;">
+                    <p>📱 Conecte seu WhatsApp</p>
+                    <p><small>Clique em "Gerar QR Code" para conectar sua conta pessoal do WhatsApp</small></p>
+                    <button onclick="initializeUserWhatsAppBot()" style="margin-top: 15px;">
+                        🔗 Gerar Meu QR Code
+                    </button>
+                </div>
+            `;
+        }
+        
+        function displayUserQRCode(qrCode) {
+            // You might want to use a QR code library to display the actual QR
+            // For now, we'll show instructions
+            document.getElementById('qrCode').innerHTML = `
+                <div style="text-align: center; padding: 20px;">
+                    <p>📱 Conecte SEU WhatsApp</p>
+                    <div style="background: white; padding: 20px; display: inline-block; margin: 10px 0;">
+                        <p><strong>QR Code Gerado!</strong></p>
+                        <p><small>O QR code está disponível no servidor</small></p>
+                        <div class="loading-spinner" style="margin: 10px auto;"></div>
+                    </div>
+                    <p><strong>Como conectar:</strong></p>
+                    <ol style="text-align: left; display: inline-block;">
+                        <li>Abra o WhatsApp no seu celular</li>
+                        <li>Toque em <strong>Configurações</strong> → <strong>Dispositivos vinculados</strong></li>
+                        <li>Toque em <strong>Vincular um dispositivo</strong></li>
+                        <li>Aponte a câmera para o QR Code</li>
+                    </ol>
+                    <p><small><em>Esta conexão é pessoal e segura para sua conta</em></small></p>
+                </div>
+            `;
+        }
+        
+        // Update the user info display
+        function updateUserInfo() {
+            document.getElementById('userEmail').textContent = userEmail;
+            document.getElementById('whatsappStatus').textContent = '❌ Não conectado';
+            document.getElementById('whatsappStatus').className = 'status-disconnected';
+        }
+        
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            updateUserInfo();
+            checkUserBotStatus();
+        });
     </script>
 </body>
 </html>

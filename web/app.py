@@ -1159,6 +1159,22 @@ def reset_session():
     
     return jsonify({'success': True})
 
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+@app.route('/init_whatsapp_bot', methods=['POST'])
+def init_whatsapp_bot():
+    """Initialize WhatsApp bot for user"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not logged in'})
+    
+    user_id = session['user_id']
+    # This would trigger your Node.js bot to initialize for this user
+    # For now, we'll just return success
+    return jsonify({'success': True, 'message': 'WhatsApp bot initialization triggered'})
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port, debug=False)

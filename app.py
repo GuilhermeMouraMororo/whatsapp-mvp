@@ -1175,6 +1175,58 @@ def init_whatsapp_bot():
     # For now, we'll just return success
     return jsonify({'success': True, 'message': 'WhatsApp bot initialization triggered'})
 
+@app.route('/init_whatsapp_bot', methods=['POST'])
+def init_whatsapp_bot():
+    """Initialize WhatsApp bot for user and get QR code"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not logged in'})
+    
+    user_id = session['user_id']
+    
+    try:
+        # In a real implementation, this would call your Node.js bot service
+        # For now, we'll simulate the bot initialization
+        # You would typically make an HTTP request to your Node.js bot here
+        
+        # Mark user's WhatsApp as ready (in real implementation, this would happen after QR scan)
+        db.update_whatsapp_status(user_id, False)  # Set to false until QR is scanned
+        
+        return jsonify({
+            'success': True, 
+            'message': 'WhatsApp bot initialization started. QR code will be generated shortly.'
+        })
+        
+    except Exception as e:
+        print(f"Error initializing WhatsApp bot: {e}")
+        return jsonify({'error': 'Failed to initialize WhatsApp bot'})
+
+@app.route('/get_qr_code')
+def get_qr_code():
+    """Get QR code for user (this would come from your Node.js bot)"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not logged in'})
+    
+    # In a real implementation, this would fetch the QR code from your Node.js bot
+    # For now, return a message about how to set up the bot
+    return jsonify({
+        'qr_available': False,
+        'message': 'QR code generation requires the Node.js WhatsApp bot to be running. Please ensure the bot service is started.'
+    })
+
+@app.route('/whatsapp_status')
+def whatsapp_status():
+    """Check WhatsApp connection status"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not logged in'})
+    
+    user_id = session['user_id']
+    user_data = db.get_user(user_id)
+    
+    return jsonify({
+        'connected': user_data['whatsapp_ready'] if user_data else False,
+        'status': 'connected' if user_data and user_data['whatsapp_ready'] else 'disconnected'
+    })
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port, debug=False)

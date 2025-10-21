@@ -1,1 +1,1065 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Order Bot - Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 20px;
+        }
+
+        /* QR Code Section */
+        .qr-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            padding: 30px;
+            text-align: center;
+            display: none;
+        }
+
+        .qr-container.active {
+            display: block;
+        }
+
+        .qr-code {
+            margin: 20px auto;
+            padding: 20px;
+            border: 2px dashed #4f46e5;
+            border-radius: 10px;
+            display: inline-block;
+        }
+
+        .qr-instructions {
+            background: #f0f9ff;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            text-align: left;
+        }
+
+        .qr-instructions ol {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+
+        .qr-instructions li {
+            margin-bottom: 8px;
+        }
+
+        /* Main Dashboard */
+        .dashboard {
+            display: none;
+        }
+
+        .dashboard.active {
+            display: block;
+        }
+
+        .chat-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 85vh;
+        }
+
+        .orders-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            padding: 20px;
+            height: 85vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            background: #4f46e5;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-option { background: #6b7280; }
+        .status-collecting { background: #f59e0b; }
+        .status-confirming { background: #10b981; }
+        .status-pending { background: #eab308; }
+
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f8fafc;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            padding: 12px 16px;
+            border-radius: 18px;
+            max-width: 85%;
+            word-wrap: break-word;
+            line-height: 1.4;
+            white-space: pre-line;
+        }
+
+        .user-message {
+            background: #4f46e5;
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 5px;
+        }
+
+        .bot-message {
+            background: #e2e8f0;
+            color: #334155;
+            margin-right: auto;
+            border-bottom-left-radius: 5px;
+        }
+
+        .bot-message-alert {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 2px solid #ef4444;
+        }
+
+        .bot-message-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 2px solid #10b981;
+        }
+
+        .bot-message-warning {
+            background: #fef3c7;
+            color: #92400e;
+            border: 2px solid #f59e0b;
+        }
+
+        .chat-input {
+            padding: 20px;
+            border-top: 1px solid #e2e8f0;
+            background: white;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 25px;
+            outline: none;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            border-color: #4f46e5;
+        }
+
+        button {
+            background: #4f46e5;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+            white-space: nowrap;
+        }
+
+        button:hover {
+            background: #4338ca;
+        }
+
+        .quick-commands {
+            display: flex;
+            gap: 5px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .quick-btn {
+            background: #94a3b8;
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .quick-btn:hover {
+            background: #64748b;
+        }
+
+        .cancel-btn {
+            background: #ef4444;
+        }
+
+        .cancel-btn:hover {
+            background: #dc2626;
+        }
+
+        .orders-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        .orders-header h2 {
+            color: #1e293b;
+            font-size: 1.5em;
+        }
+
+        .download-btn {
+            background: #10b981;
+            padding: 8px 16px;
+            font-size: 12px;
+        }
+
+        .download-btn:hover {
+            background: #059669;
+        }
+
+        .orders-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .order-section {
+            margin-bottom: 25px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            background: #f8fafc;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+
+        .global-header {
+            color: #1e40af;
+            background: #dbeafe;
+        }
+
+        .confirmed-header {
+            color: #065f46;
+            background: #d1fae5;
+        }
+
+        .pending-header {
+            color: #92400e;
+            background: #fef3c7;
+        }
+
+        .order-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            margin-bottom: 6px;
+            background: white;
+            border-radius: 6px;
+            border-left: 4px solid #4f46e5;
+        }
+
+        .global-item {
+            border-left: 4px solid #3b82f6;
+            background: #f0f9ff;
+        }
+
+        .confirmed-item {
+            border-left: 4px solid #10b981;
+            background: #f0fdf4;
+        }
+
+        .pending-item {
+            border-left: 4px solid #eab308;
+            background: #fefce8;
+        }
+
+        .auto-order-box {
+            border: 2px solid #eab308;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            background: #fefce8;
+            overflow: hidden;
+        }
+
+        .auto-order-header {
+            background: #eab308;
+            color: white;
+            padding: 8px 12px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .auto-order-actions {
+            display: flex;
+            gap: 10px;
+            padding: 10px;
+            background: #fefce8;
+            border-top: 1px solid #eab308;
+        }
+
+        .confirm-btn {
+            background: #10b981 !important;
+            color: white !important;
+            border: none !important;
+            padding: 8px 12px !important;
+            border-radius: 5px !important;
+            font-size: 12px !important;
+            cursor: pointer !important;
+            flex: 1;
+        }
+
+        .delete-btn {
+            background: #ef4444 !important;
+            color: white !important;
+            border: none !important;
+            padding: 8px 12px !important;
+            border-radius: 5px !important;
+            font-size: 12px !important;
+            cursor: pointer !important;
+            flex: 1;
+        }
+
+        .confirm-btn:hover {
+            background: #059669 !important;
+        }
+
+        .delete-btn:hover {
+            background: #dc2626 !important;
+        }
+
+        .product-name {
+            font-weight: 600;
+            color: #334155;
+        }
+
+        .product-quantity {
+            background: #4f46e5;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-weight: bold;
+            min-width: 35px;
+            text-align: center;
+            font-size: 12px;
+        }
+
+        .global-quantity {
+            background: #3b82f6;
+        }
+
+        .confirmed-quantity {
+            background: #10b981;
+        }
+
+        .pending-quantity {
+            background: #eab308;
+        }
+
+        .empty-orders {
+            text-align: center;
+            color: #64748b;
+            font-style: italic;
+            padding: 20px;
+        }
+
+        .session-info {
+            background: #f0f9ff;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+
+        .reset-btn {
+            background: #ef4444;
+            margin-top: 10px;
+            width: 100%;
+        }
+
+        .reset-btn:hover {
+            background: #dc2626;
+        }
+
+        .typing-indicator {
+            display: none;
+            padding: 12px 16px;
+            background: #e2e8f0;
+            border-radius: 18px;
+            margin-right: auto;
+            border-bottom-left-radius: 5px;
+            color: #64748b;
+            font-style: italic;
+        }
+
+        .refresh-btn {
+            background: #8b5cf6;
+            padding: 6px 12px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+
+        .refresh-btn:hover {
+            background: #7c3aed;
+        }
+
+        .user-info {
+            background: #dbeafe;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .user-email {
+            font-weight: bold;
+            color: #1e40af;
+        }
+
+        .whatsapp-status {
+            margin-top: 5px;
+            font-size: 14px;
+        }
+
+        .status-connected {
+            color: #10b981;
+        }
+
+        .status-disconnected {
+            color: #ef4444;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            .chat-container, .orders-container {
+                height: 60vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- QR Code Section -->
+    <div id="qrSection" class="qr-container">
+        <h2>🔗 Conectar WhatsApp</h2>
+        <p>Escaneie o código QR abaixo com o WhatsApp para conectar sua conta:</p>
+        
+        <div class="qr-code" id="qrCode">
+            <p>Carregando código QR...</p>
+        </div>
+
+        <div class="qr-instructions">
+            <h4>📋 Como conectar:</h4>
+            <ol>
+                <li>Abra o WhatsApp no seu celular</li>
+                <li>Toque em <strong>Configurações</strong> → <strong>Dispositivos vinculados</strong> → <strong>Vincular um dispositivo</strong></li>
+                <li>Aponte a câmera para o código QR acima</li>
+                <li>Aguarde a confirmação de conexão</li>
+            </ol>
+        </div>
+
+        <div style="margin-top: 20px;">
+            <button onclick="checkQRStatus()">🔄 Verificar Status</button>
+            <button class="cancel-btn" onclick="logout()">🚪 Sair</button>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="dashboard" class="dashboard">
+        <div class="container">
+            <div class="chat-container">
+                <div class="chat-header">
+                    <h1>🤖 Sistema de Pedidos - Assistente Inteligente</h1>
+                    <div id="statusDisplay">
+                        <span class="status-indicator status-collecting"></span>
+                        <span id="statusText">Coletando pedidos...</span>
+                    </div>
+                </div>
+                
+                <div class="chat-messages" id="chatMessages">
+                    <div class="message bot-message">
+                        **Olá! Sou seu assistente inteligente** 🤖
+
+                        **Produtos disponíveis:**
+                        • Frutas: limão, abacaxi, acerola, manga, maracujá, morango, etc.
+                        • Laticínios: ovo, queijo, caixa de ovos
+
+                        **Como funciona:**
+                        • Digite pedidos como "2 mangas", "cinco queijos", "uma caixa de ovos"
+                        • Após 30s de inatividade OU digitar "pronto", enviarei um resumo
+                        • Confirme com "confirmar" ou cancele com "nao"
+                        • Enviarei lembretes a cada 30s (até 5x) até sua resposta
+
+                        **Comandos:** pronto, confirmar, nao, cancelar, hoje não
+                    </div>
+                    <div class="typing-indicator" id="typingIndicator">Digitando...</div>
+                </div>
+                
+                <div class="chat-input">
+                    <div class="input-group">
+                        <input type="text" id="messageInput" placeholder="Ex: 2 mangas e 3 queijos..." autocomplete="off">
+                        <button onclick="sendMessage()">Enviar</button>
+                    </div>
+                    <div class="quick-commands">
+                        <button class="quick-btn" onclick="quickCommand('pronto')">Pronto</button>
+                        <button class="quick-btn" onclick="quickCommand('confirmar')">Confirmar</button>
+                        <button class="quick-btn" onclick="quickCommand('nao')">Não</button>
+                        <button class="cancel-btn quick-btn" onclick="quickCommand('cancelar')">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="orders-container">
+                <div class="user-info">
+                    <div class="user-email" id="userEmail">user@example.com</div>
+                    <div class="whatsapp-status">
+                        Status WhatsApp: <span id="whatsappStatus" class="status-connected">✅ Conectado</span>
+                    </div>
+                </div>
+
+                <div class="orders-header">
+                    <h2>📊 Pedidos Globais</h2>
+                    <div>
+                        <button class="refresh-btn" onclick="refreshGlobalOrders()">🔄</button>
+                        <button class="download-btn" onclick="downloadExcel()">📥 Excel</button>
+                    </div>
+                </div>
+                
+                <div class="session-info">
+                    <div><strong>Sessão:</strong> <span id="sessionId">{{ session_id }}</span></div>
+                    <div><strong>Status:</strong> <span id="sessionStatus">Coletando</span></div>
+                    <div><strong>Itens Atuais:</strong> <span id="itemCount">0</span></div>
+                    <div><strong>Lembretes:</strong> <span id="remindersStatus">0/5</span></div>
+                </div>
+                
+                <div class="orders-list" id="ordersList">
+                    <!-- Global Orders Section -->
+                    <div class="order-section">
+                        <div class="section-header global-header">
+                            <span>🌍 Todos os Pedidos Confirmados</span>
+                            <span id="globalCount">0</span>
+                        </div>
+                        <div id="globalOrders">
+                            <div class="empty-orders">Nenhum pedido global ainda</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Auto-Confirmed Orders Section -->
+                    <div class="order-section">
+                        <div class="section-header pending-header">
+                            <span>🟡 Pedidos Confirmados Automaticamente</span>
+                            <span id="autoOrdersCount">0</span>
+                        </div>
+                        <div id="autoConfirmedOrders">
+                            <div class="empty-orders">Nenhum pedido automático</div>
+                        </div>
+                    </div>
+
+                    <!-- Current User's Orders Sections -->
+                    <div class="order-section">
+                        <div class="section-header confirmed-header">
+                            <span>✅ Seus Pedidos Confirmados</span>
+                            <span id="confirmedCount">0</span>
+                        </div>
+                        <div id="confirmedOrders">
+                            <div class="empty-orders">Nenhum pedido confirmado</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <button class="reset-btn" onclick="resetSession()">🔄 Reiniciar Sessão</button>
+                <button class="cancel-btn reset-btn" onclick="logout()">🚪 Sair</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const sessionId = '{{ session_id }}';
+        const userEmail = '{{ user.email }}';
+        let updateInterval = null;
+        let globalOrdersInterval = null;
+        let currentState = 'collecting';
+        let qrCheckInterval = null;
+
+        // Initialize page based on user's WhatsApp status
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('userEmail').textContent = userEmail;
+            checkInitialStatus();
+        });
+
+        async function checkInitialStatus() {
+            try {
+                const response = await fetch('/get_qr_status');
+                const data = await response.json();
+                
+                if (data.has_whatsapp_session) {
+                    // User has WhatsApp session - show dashboard
+                    showDashboard();
+                    startPolling();
+                    startGlobalOrdersPolling();
+                } else {
+                    // User needs to connect WhatsApp - show QR section
+                    showQRCode();
+                    startQRPolling();
+                }
+            } catch (error) {
+                console.error('Error checking initial status:', error);
+                showQRCode();
+            }
+        }
+
+        function showQRCode() {
+            document.getElementById('qrSection').classList.add('active');
+            document.getElementById('dashboard').classList.remove('active');
+            document.getElementById('whatsappStatus').textContent = '❌ Desconectado';
+            document.getElementById('whatsappStatus').className = 'status-disconnected';
+        }
+
+        function showDashboard() {
+            document.getElementById('qrSection').classList.remove('active');
+            document.getElementById('dashboard').classList.add('active');
+            document.getElementById('whatsappStatus').textContent = '✅ Conectado';
+            document.getElementById('whatsappStatus').className = 'status-connected';
+        }
+
+        function startQRPolling() {
+            if (qrCheckInterval) clearInterval(qrCheckInterval);
+            qrCheckInterval = setInterval(checkQRStatus, 3000); // Check every 3 seconds
+        }
+
+        async function checkQRStatus() {
+            try {
+                const response = await fetch('/get_qr_status');
+                const data = await response.json();
+                
+                if (data.has_whatsapp_session) {
+                    // WhatsApp connected - switch to dashboard
+                    clearInterval(qrCheckInterval);
+                    showDashboard();
+                    startPolling();
+                    startGlobalOrdersPolling();
+                    
+                    // Initialize bot for this user
+                    await initializeWhatsAppBot();
+                } else {
+                    // Still waiting for connection
+                    document.getElementById('qrCode').innerHTML = 
+                        '<p>⏳ Aguardando código QR... O sistema irá gerar automaticamente.</p>' +
+                        '<p><small>Se demorar mais de 30 segundos, recarregue a página.</small></p>';
+                }
+            } catch (error) {
+                console.error('Error checking QR status:', error);
+            }
+        }
+
+        async function initializeWhatsAppBot() {
+            try {
+                // This would trigger the Node.js bot to initialize for this user
+                const response = await fetch('/init_whatsapp_bot', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id: sessionId })
+                });
+                console.log('WhatsApp bot initialization triggered');
+            } catch (error) {
+                console.error('Error initializing WhatsApp bot:', error);
+            }
+        }
+
+        // Your existing polling and chat functions (keep all of them)
+        function startPolling() {
+            if (updateInterval) clearInterval(updateInterval);
+            updateInterval = setInterval(checkUpdates, 2000);
+        }
+
+        async function confirmAutoOrder(orderGroup) {
+            try {
+                const response = await fetch('/confirm_auto_order', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ order_group: orderGroup })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    addMessage("✅ **PEDIDO AUTOMÁTICO CONFIRMADO!** Os itens foram adicionados ao total principal.", 'bot', 'success');
+                    loadGlobalOrders();
+                } else {
+                    addMessage("❌ Erro ao confirmar pedido automático.", 'bot', 'alert');
+                }
+            } catch (error) {
+                console.error('Error confirming auto order:', error);
+                addMessage('❌ Erro de conexão ao confirmar pedido.', 'bot', 'alert');
+            }
+        }
+
+        async function deleteAutoOrder(orderGroup) {
+            if (!confirm('Tem certeza que deseja excluir este pedido automático?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/delete_auto_order', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ order_group: orderGroup })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    addMessage("🗑️ **PEDIDO AUTOMÁTICO EXCLUÍDO!**", 'bot', 'alert');
+                    loadGlobalOrders();
+                } else {
+                    addMessage("❌ Erro ao excluir pedido automático.", 'bot', 'alert');
+                }
+            } catch (error) {
+                console.error('Error deleting auto order:', error);
+                addMessage('❌ Erro de conexão ao excluir pedido.', 'bot', 'alert');
+            }
+        }
+
+        function startGlobalOrdersPolling() {
+            if (globalOrdersInterval) clearInterval(globalOrdersInterval);
+            globalOrdersInterval = setInterval(loadGlobalOrders, 5000);
+            loadGlobalOrders();
+        }
+
+        async function loadGlobalOrders() {
+            try {
+                const response = await fetch('/global_orders');
+                const globalOrders = await response.json();
+                updateGlobalOrdersDisplay(globalOrders);
+            } catch (error) {
+                console.log('Error loading global orders:', error);
+            }
+        }
+
+        function updateGlobalOrdersDisplay(globalOrders) {
+            const globalOrdersContainer = document.getElementById('globalOrders');
+            const autoOrdersContainer = document.getElementById('autoConfirmedOrders');
+            const globalCount = document.getElementById('globalCount');
+            const autoCount = document.getElementById('autoOrdersCount');
+            
+            if (globalOrders.main_orders && Object.keys(globalOrders.main_orders).length > 0) {
+                globalCount.textContent = Object.keys(globalOrders.main_orders).length;
+                globalOrdersContainer.innerHTML = Object.entries(globalOrders.main_orders).map(([product, quantity]) => 
+                    `<div class="order-item global-item">
+                        <span class="product-name">${product}</span>
+                        <span class="product-quantity global-quantity">${quantity}</span>
+                    </div>`
+                ).join('');
+            } else {
+                globalCount.textContent = '0';
+                globalOrdersContainer.innerHTML = '<div class="empty-orders">Nenhum pedido global ainda</div>';
+            }
+            
+            if (globalOrders.auto_orders && Object.keys(globalOrders.auto_orders).length > 0) {
+                autoCount.textContent = Object.keys(globalOrders.auto_orders).length;
+                autoOrdersContainer.innerHTML = Object.entries(globalOrders.auto_orders).map(([orderGroup, products]) => 
+                    `<div class="auto-order-box">
+                        <div class="auto-order-header">
+                            <span>Pedido Automático</span>
+                        </div>
+                        ${Object.entries(products).map(([product, quantity]) => 
+                            `<div class="order-item pending-item">
+                                <span class="product-name">${product}</span>
+                                <span class="product-quantity pending-quantity">${quantity}</span>
+                            </div>`
+                        ).join('')}
+                        <div class="auto-order-actions">
+                            <button class="confirm-btn" onclick="confirmAutoOrder('${orderGroup}')">✅ Confirmar</button>
+                            <button class="delete-btn" onclick="deleteAutoOrder('${orderGroup}')">❌ Excluir</button>
+                        </div>
+                    </div>`
+                ).join('');
+            } else {
+                autoCount.textContent = '0';
+                autoOrdersContainer.innerHTML = '<div class="empty-orders">Nenhum pedido automático</div>';
+            }
+        }
+
+        function refreshGlobalOrders() {
+            loadGlobalOrders();
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = '⏳';
+            setTimeout(() => {
+                btn.textContent = '🔄';
+            }, 1000);
+        }
+
+        async function checkUpdates() {
+            try {
+                const response = await fetch('/get_updates', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({session_id: sessionId})
+                });
+                
+                const data = await response.json();
+                
+                if (data.state !== currentState) {
+                    currentState = data.state;
+                    updateStatusDisplay(data);
+                }
+                
+                updateOrdersDisplay(data);
+                updateSessionInfo(data);
+                
+                if (data.has_message) {
+                    let messageType = 'normal';
+                    if (data.bot_message.includes('❌') || data.bot_message.includes('CANCELADO')) 
+                        messageType = 'alert';
+                    else if (data.bot_message.includes('✅') || data.bot_message.includes('CONFIRMADO'))
+                        messageType = 'success';
+                    else if (data.bot_message.includes('⚠️') || data.bot_message.includes('LEMBRETE'))
+                        messageType = 'warning';
+                    else if (data.bot_message.includes('🟡') || data.bot_message.includes('PENDENTE'))
+                        messageType = 'warning';
+                        
+                    addMessage(data.bot_message, 'bot', messageType);
+                }
+                
+            } catch (error) {
+                console.log('Polling error:', error);
+            }
+        }
+
+        function updateStatusDisplay(data) {
+            const statusText = document.getElementById('statusText');
+            const sessionStatus = document.getElementById('sessionStatus');
+            const statusIndicator = document.querySelector('.status-indicator');
+            
+            statusIndicator.className = 'status-indicator';
+            
+            if (data.state === 'option') {
+                statusText.textContent = 'Aguardando opção...';
+                sessionStatus.textContent = 'Opção';
+                statusIndicator.classList.add('status-option');
+            } else if (data.state === 'collecting') {
+                statusText.textContent = 'Coletando pedidos - Timer 30s ativo';
+                sessionStatus.textContent = 'Coletando';
+                statusIndicator.classList.add('status-collecting');
+            } else if (data.state === 'confirming') {
+                statusText.textContent = `Aguardando confirmação - Lembretes ${data.reminders_sent || 0}/5`;
+                sessionStatus.textContent = 'Confirmando';
+                statusIndicator.classList.add('status-confirming');
+            } else if (data.state === 'pending_confirmation') {
+                statusText.textContent = 'Pedido pendente - Aguardando confirmação';
+                sessionStatus.textContent = 'Pendente';
+                statusIndicator.classList.add('status-pending');
+            }
+        }
+
+        function updateSessionInfo(data) {
+            const itemCount = document.getElementById('itemCount');
+            const remindersStatus = document.getElementById('remindersStatus');
+            
+            itemCount.textContent = Object.keys(data.current_orders).length;
+            remindersStatus.textContent = `${data.reminders_sent || 0}/5`;
+        }
+
+        function updateOrdersDisplay(data) {
+            const confirmedOrders = document.getElementById('confirmedOrders');
+            const confirmedCount = document.getElementById('confirmedCount');
+            
+            const allConfirmedOrders = [...(data.confirmed_orders || []), ...(data.pending_orders || [])];
+            
+            if (allConfirmedOrders.length > 0) {
+                confirmedCount.textContent = allConfirmedOrders.length;
+                confirmedOrders.innerHTML = allConfirmedOrders.map((order, index) => {
+                    const isFormerPending = index >= (data.confirmed_orders?.length || 0);
+                    const itemClass = isFormerPending ? 'order-item pending-item' : 'order-item confirmed-item';
+                    const quantityClass = isFormerPending ? 'product-quantity pending-quantity' : 'product-quantity confirmed-quantity';
+                    const statusText = isFormerPending ? ' (Confirmado Automaticamente)' : '';
+                    
+                    return `<div style="margin-bottom: 15px;">
+                        <div style="font-weight: bold; color: ${isFormerPending ? '#92400e' : '#065f46'}; margin-bottom: 5px; font-size: 14px;">
+                            Pedido ${index + 1}${statusText}:
+                        </div>
+                        ${Object.entries(order).map(([product, quantity]) => 
+                            `<div class="${itemClass}">
+                                <span class="product-name">${product}</span>
+                                <span class="${quantityClass}">${quantity}</span>
+                            </div>`
+                        ).join('')}
+                    </div>`;
+                }).join('');
+            } else {
+                confirmedCount.textContent = '0';
+                confirmedOrders.innerHTML = '<div class="empty-orders">Nenhum pedido confirmado</div>';
+            }
+        }
+
+        function addMessage(text, sender, messageType = 'normal') {
+            if (!text) return;
+            
+            const chatMessages = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            
+            if (sender === 'user') {
+                messageDiv.className = 'message user-message';
+            } else {
+                let messageClass = 'message bot-message';
+                if (messageType === 'warning') messageClass += ' bot-message-warning';
+                if (messageType === 'success') messageClass += ' bot-message-success';
+                if (messageType === 'alert') messageClass += ' bot-message-alert';
+                messageDiv.className = messageClass;
+            }
+            
+            messageDiv.textContent = text;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function showTypingIndicator() {
+            document.getElementById('typingIndicator').style.display = 'block';
+            document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+        }
+
+        function hideTypingIndicator() {
+            document.getElementById('typingIndicator').style.display = 'none';
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            addMessage(message, 'user');
+            input.value = '';
+            
+            showTypingIndicator();
+            
+            try {
+                const response = await fetch('/send_message', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        message: message,
+                        session_id: sessionId
+                    })
+                });
+                
+                const data = await response.json();
+                hideTypingIndicator();
+                
+                if (data.bot_message) {
+                    let messageType = 'normal';
+                    if (data.bot_message.includes('❌') || data.status === 'reset') 
+                        messageType = 'alert';
+                    else if (data.bot_message.includes('✅') || data.status === 'confirmed')
+                        messageType = 'success';
+                    else if (data.bot_message.includes('⚠️') || data.bot_message.includes('LEMBRETE'))
+                        messageType = 'warning';
+                    else if (data.bot_message.includes('🟡') || data.bot_message.includes('PENDENTE'))
+                        messageType = 'warning';
+                        
+                    addMessage(data.bot_message, 'bot', messageType);
+                }
+                
+                updateOrdersDisplay(data);
+                
+                if (data.status === 'confirmed') {
+                    loadGlobalOrders();
+                }
+                
+            } catch (error) {
+                hideTypingIndicator();
+                addMessage('❌ Erro de conexão. Tente novamente.', 'bot', 'alert');
+                console.error('Error:', error);
+            }
+        }
+
+        function quickCommand(command) {
+            document.getElementById('messageInput').value = command;
+            sendMessage();
+        }
+
+        async function resetSession() {
+            if (confirm('Reiniciar a sessão? Seus pedidos não confirmados serão perdidos, mas os pedidos globais permanecem.')) {
+                try {
+                    await fetch('/reset_session', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({session_id: sessionId})
+                    });
+                    location.reload();
+                } catch (error) {
+                    addMessage('❌ Erro ao reiniciar sessão.', 'bot', 'alert');
+                }
+            }
+        }
+
+        function downloadExcel() {
+            window.open('/download_excel', '_blank');
+        }
+
+        function logout() {
+            if (confirm('Deseja sair do sistema?')) {
+                window.location.href = '/logout';
+            }
+        }
+
+        // Enter key to send message
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Load initial orders when dashboard is shown
+        function loadInitialOrders() {
+            fetch(`/get_orders?session_id=${sessionId}`)
+                .then(response => response.json())
+                .then(orders => updateOrdersDisplay(orders));
+        }
+    </script>
+</body>
+</html>

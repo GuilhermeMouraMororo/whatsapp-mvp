@@ -1246,16 +1246,20 @@ def init_user_bot():
     user_id = session['user_id']
     
     try:
+        # Initialize the user session
+        session_obj = get_user_session(user_id)
+        
         # Call Node.js service to initialize bot for this user
         bot_service_url = os.environ.get('NODE_SERVICE_URL', 'http://localhost:3000')
-        response = requests.post(f'{bot_service_url}/init_user', json={
-            'user_id': user_id
-        }, timeout=30)
+        response = requests.post(f'{bot_service_url}/init_user', 
+            json={'user_id': user_id},
+            timeout=30
+        )
         
         if response.status_code == 200:
             return jsonify({
                 'success': True, 
-                'message': 'WhatsApp bot initialization started for your account'
+                'message': 'WhatsApp bot initialization started'
             })
         else:
             return jsonify({
@@ -1268,7 +1272,46 @@ def init_user_bot():
             'success': False,
             'error': f'Cannot connect to WhatsApp bot service: {str(e)}'
         })
-
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Initialization error: {str(e)}'
+        })@app.route('/api/user_bot_status')
+def get_user_bot_status():
+    """Get current bot status for the logged-in user"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not logged in'})
+    
+    user_id = session['user_id']
+    
+    try:
+        # Get user data from database
+        user_data = db.get_user(user_id)
+        
+        # Check Node.js service for current status
+        bot_service_url = os.environ.get('NODE_SERVICE_URL', 'http://localhost:3000')
+        response = requests.get(f'{bot_service_url}/user_status/{user_id}', timeout=5)
+        
+        if response.status_code == 200:
+            bot_status = response.json()
+            return jsonify(bot_status)
+        else:
+            # Fallback to database status
+            return jsonify({
+                'connected': user_data['whatsapp_ready'] if user_data else False,
+                'has_qr': False,
+                'service_running': False
+            })
+        
+    except requests.exceptions.RequestException:
+        # Service unavailable, use database status
+        user_data = db.get_user(user_id)
+        return jsonify({
+            'connected': user_data['whatsapp_ready'] if user_data else False,
+            'has_qr': False,
+            'service_running': False
+        })
+        
 @app.route('/api/user_qr_code', methods=['POST'])
 def handle_user_qr_code():
     """Store QR code for a specific user"""
@@ -1347,20 +1390,29 @@ def get_user_bot_status():
         # Get user data from database
         user_data = db.get_user(user_id)
         
-        # Check if user has QR code waiting
-        has_qr = user_id in user_qr_codes
+        # Check Node.js service for current status
+        bot_service_url = os.environ.get('NODE_SERVICE_URL', 'http://localhost:3000')
+        response = requests.get(f'{bot_service_url}/user_status/{user_id}', timeout=5)
         
-        status = {
+        if response.status_code == 200:
+            bot_status = response.json()
+            return jsonify(bot_status)
+        else:
+            # Fallback to database status
+            return jsonify({
+                'connected': user_data['whatsapp_ready'] if user_data else False,
+                'has_qr': False,
+                'service_running': False
+            })
+        
+    except requests.exceptions.RequestException:
+        # Service unavailable, use database status
+        user_data = db.get_user(user_id)
+        return jsonify({
             'connected': user_data['whatsapp_ready'] if user_data else False,
-            'has_qr': has_qr,
-            'qr_code': user_qr_codes.get(user_id, {}).get('qr_code') if has_qr else None,
-            'service_running': True
-        }
-        
-        return jsonify(status)
-        
-    except Exception as e:
-        return jsonify({'service_running': False, 'error': str(e)})
+            'has_qr': False,
+            'service_running': False
+        })
 
 def process_user_whatsapp_message(user_id, customer_phone, message):
     """Process incoming WhatsApp messages for a specific business user"""

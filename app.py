@@ -1175,6 +1175,48 @@ def init_whatsapp_bot():
     # For now, we'll just return success
     return jsonify({'success': True, 'message': 'WhatsApp bot initialization triggered'})
 
+@app.route('/qr_code', methods=['POST'])
+def handle_qr_code():
+    """Store QR code for frontend display"""
+    data = request.json
+    user_id = data.get('user_id')
+    qr_code = data.get('qr_code')
+    
+    # Store in database or in-memory (for demo)
+    # You might want to create a qr_codes table
+    print(f"QR received for user {user_id}: {qr_code}")
+    
+    return jsonify({'success': True})
+
+@app.route('/get_whatsapp_session', methods=['GET'])
+def get_whatsapp_session():
+    """Check if user has WhatsApp session"""
+    user_id = request.args.get('user_id')
+    
+    # Check database for session status
+    session_data = db.get_whatsapp_session(user_id)
+    if session_data and session_data.get('ready'):
+        return jsonify({
+            'session': {
+                'ready': True,
+                'client_id': session_data.get('client_id')
+            }
+        })
+    
+    return jsonify({'session': None})
+
+@app.route('/save_whatsapp_session', methods=['POST'])
+def save_whatsapp_session():
+    """Save WhatsApp session status"""
+    data = request.json
+    user_id = data.get('user_id')
+    client_id = data.get('client_id')
+    ready = data.get('ready', False)
+    
+    db.save_whatsapp_session(user_id, client_id, ready)
+    
+    return jsonify({'success': True})
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port, debug=False)

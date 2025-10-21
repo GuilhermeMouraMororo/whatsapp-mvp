@@ -11,44 +11,22 @@ class MultiUserWhatsAppBot {
         
         console.log('🚀 Starting Multi-User WhatsApp Bot Manager...');
     }
-
-    // Initialize a WhatsApp client for a specific user
+    
+    // Add this method to your MultiUserWhatsAppBot class
     async initializeUserClient(userId) {
         try {
             console.log(`🔧 Initializing WhatsApp client for user: ${userId}`);
             
             // Check if user already has a client
             if (this.userClients.has(userId)) {
-                console.log(`✅ User ${userId} already has WhatsApp client`);
-                return this.userClients.get(userId);
-            }
-
-            const client = new Client({
-                authStrategy: new LocalAuth({
-                    clientId: `user-${userId}` // Unique session for each user
-                }),
-                puppeteer: {
-                    headless: true,
-                    args: [
-                        '--no-sandbox',
-                        '--disable-setuid-sandbox',
-                        '--disable-dev-shm-usage'
-                    ]
+                const client = this.userClients.get(userId);
+                if (this.userStatus.get(userId) === 'connected') {
+                    console.log(`✅ User ${userId} already connected`);
+                    return client;
                 }
-            });
-
-            // Store the client
-            this.userClients.set(userId, client);
-            this.userStatus.set(userId, 'initializing');
-
-            // Set up event handlers for this user's client
-            this.setupUserClientEvents(userId, client);
-
-            // Initialize the client
-            await client.initialize();
-            
-            return client;
-
+            }
+    
+            return await this.initializeUserClient(userId);
         } catch (error) {
             console.error(`❌ Error initializing client for user ${userId}:`, error);
             throw error;

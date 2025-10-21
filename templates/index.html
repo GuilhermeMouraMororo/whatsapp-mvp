@@ -374,31 +374,6 @@
             color: #334155;
         }
 
-        .loading-spinner {
-            margin: 20px auto;
-            width: 40px;
-            height: 40px;
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #4f46e5;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .qr-image {
-            max-width: 300px;
-            margin: 0 auto;
-            display: block;
-            border: 2px solid #e2e8f0;
-            border-radius: 10px;
-            padding: 10px;
-            background: white;
-        }
-        
         .product-quantity {
             background: #4f46e5;
             color: white;
@@ -510,37 +485,26 @@
     <!-- QR Code Section -->
     <div id="qrSection" class="qr-container">
         <h2>🔗 Conectar WhatsApp</h2>
-        <p>Para usar o sistema, você precisa conectar sua conta do WhatsApp:</p>
+        <p>Escaneie o código QR abaixo com o WhatsApp para conectar sua conta:</p>
         
         <div class="qr-code" id="qrCode">
-            <div style="text-align: center; padding: 20px;">
-                <p>🔄 Preparando código QR...</p>
-                <div class="loading-spinner" style="margin: 20px auto; width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #4f46e5; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-            </div>
+            <p>Carregando código QR...</p>
         </div>
-    
+
         <div class="qr-instructions">
             <h4>📋 Como conectar:</h4>
             <ol>
-                <li>Clique no botão "Gerar QR Code" abaixo</li>
                 <li>Abra o WhatsApp no seu celular</li>
                 <li>Toque em <strong>Configurações</strong> → <strong>Dispositivos vinculados</strong> → <strong>Vincular um dispositivo</strong></li>
-                <li>Aponte a câmera para o código QR</li>
-                <li>Aguarde a confirmação de conexão automática</li>
+                <li>Aponte a câmera para o código QR acima</li>
+                <li>Aguarde a confirmação de conexão</li>
             </ol>
-            
-            <div style="background: #fffbeb; padding: 10px; border-radius: 5px; margin-top: 10px; border-left: 4px solid #f59e0b;">
-                <strong>⚠️ Importante:</strong> Use o mesmo número de WhatsApp que seus clientes irão enviar mensagens.
-            </div>
         </div>
-    
-        <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
-            <button onclick="generateQRCode()" id="generateQRBtn">🔗 Gerar QR Code</button>
-            <button onclick="checkQRStatus()" id="checkStatusBtn">🔄 Verificar Status</button>
+
+        <div style="margin-top: 20px;">
+            <button onclick="checkQRStatus()">🔄 Verificar Status</button>
             <button class="cancel-btn" onclick="logout()">🚪 Sair</button>
         </div>
-    
-        <div id="qrMessage" style="margin-top: 15px; text-align: center;"></div>
     </div>
 
     <!-- Main Dashboard -->
@@ -705,7 +669,6 @@
             if (qrCheckInterval) clearInterval(qrCheckInterval);
             qrCheckInterval = setInterval(checkQRStatus, 3000); // Check every 3 seconds
         }
-        
 
         async function checkQRStatus() {
             try {
@@ -1097,248 +1060,6 @@
                 .then(response => response.json())
                 .then(orders => updateOrdersDisplay(orders));
         }
-
-        let qrCheckInterval = null;
-        
-        async function generateQRCode() {
-            const qrCodeElement = document.getElementById('qrCode');
-            const qrMessageElement = document.getElementById('qrMessage');
-            
-            try {
-                qrCodeElement.innerHTML = `
-                    <div style="text-align: center; padding: 20px;">
-                        <p>🔄 Inicializando WhatsApp...</p>
-                        <div class="loading-spinner"></div>
-                    </div>
-                `;
-        
-                const response = await fetch('/api/init_user_bot', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ user_id: sessionId })
-                });
-        
-                const data = await response.json();
-                
-                if (data.success) {
-                    qrMessageElement.innerHTML = '<div style="color: #10b981;">✅ Bot inicializado! Aguardando QR Code...</div>';
-                    startQRPolling();
-                } else {
-                    throw new Error(data.error || 'Falha ao inicializar bot');
-                }
-            } catch (error) {
-                console.error('Error generating QR code:', error);
-                qrCodeElement.innerHTML = `
-                    <div style="text-align: center; padding: 20px; color: #ef4444;">
-                        <p>❌ Erro ao conectar com WhatsApp</p>
-                        <p><small>${error.message}</small></p>
-                    </div>
-                `;
-            }
-        }
-
-        function displayQRCode(qrCode) {
-            const qrCodeElement = document.getElementById('qrCode');
-            qrCodeElement.innerHTML = `
-                <div style="text-align: center;">
-                    <p>📱 Escaneie este QR Code com o WhatsApp</p>
-                    <div style="background: white; padding: 20px; display: inline-block; margin: 10px 0; border-radius: 10px;">
-                        <img src="${generateQRImage(qrCode)}" alt="QR Code" style="max-width: 250px;">
-                    </div>
-                    <p><strong>Como conectar:</strong></p>
-                    <ol style="text-align: left; display: inline-block;">
-                        <li>Abra o WhatsApp no seu celular</li>
-                        <li>Toque em <strong>Configurações</strong> → <strong>Dispositivos vinculados</strong></li>
-                        <li>Toque em <strong>Vincular um dispositivo</strong></li>
-                        <li>Aponte a câmera para o QR Code acima</li>
-                    </ol>
-                </div>
-            `;
-        }
-        
-        function generateQRImage(qrCode) {
-            // Simple QR code image generation using a service
-            return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrCode)}`;
-        }
-            
-        async function checkQRStatus() {
-            try {
-                const response = await fetch('/api/user_bot_status');
-                const data = await response.json();
-                
-                if (data.connected) {
-                    clearInterval(qrCheckInterval);
-                    showDashboard();
-                    startPolling();
-                    startGlobalOrdersPolling();
-                } else if (data.has_qr && data.qr_code) {
-                    // Display the actual QR code
-                    displayQRCode(data.qr_code);
-                }
-            } catch (error) {
-                console.error('Error checking QR status:', error);
-            }
-        }
-        
-                
-        function startQRPolling() {
-            if (qrCheckInterval) clearInterval(qrCheckInterval);
-            qrCheckInterval = setInterval(checkQRStatus, 3000); // Check every 3 seconds
-            
-            // Also update the QR code display to show it's waiting
-            document.getElementById('qrCode').innerHTML = `
-                <div style="text-align: center; padding: 20px;">
-                    <p>📱 Aguardando código QR do WhatsApp...</p>
-                    <div class="loading-spinner"></div>
-                    <p><small>O código será gerado automaticamente pelo serviço do bot.</small></p>
-                </div>
-            `;
-        }
-        
-        // Update the checkInitialStatus function
-        async function checkInitialStatus() {
-            try {
-                const response = await fetch('/whatsapp_status');
-                const data = await response.json();
-                
-                if (data.connected) {
-                    // User has WhatsApp session - show dashboard
-                    showDashboard();
-                    startPolling();
-                    startGlobalOrdersPolling();
-                    loadInitialOrders();
-                } else {
-                    // User needs to connect WhatsApp - show QR section
-                    showQRCode();
-                }
-            } catch (error) {
-                console.error('Error checking initial status:', error);
-                showQRCode();
-            }
-        }
-        
-        // Add this function to load initial orders
-        function loadInitialOrders() {
-            fetch(`/get_orders?session_id=${sessionId}`)
-                .then(response => response.json())
-                .then(orders => updateOrdersDisplay(orders))
-                .catch(error => console.error('Error loading initial orders:', error));
-        }
-        async function initializeUserWhatsAppBot() {
-            if (!userEmail || !sessionId) {
-                showError('Usuário não identificado. Faça login novamente.');
-                return;
-            }
-        
-            try {
-                showUserLoadingState();
-                
-                const response = await fetch('/api/init_user_bot', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ user_id: sessionId })
-                });
-                
-                if (response.ok) {
-                    startUserQRPolling();
-                } else {
-                    throw new Error('Failed to initialize user bot');
-                }
-            } catch (error) {
-                showError('Erro ao conectar com WhatsApp: ' + error.message);
-            }
-        }
-        
-        async function checkUserBotStatus() {
-            try {
-                const response = await fetch('/api/user_bot_status');
-                const status = await response.json();
-                
-                if (status.connected) {
-                    showDashboard();
-                } else if (status.has_qr && status.qr_code) {
-                    displayUserQRCode(status.qr_code);
-                } else if (status.has_qr) {
-                    showUserWaitingState();
-                } else {
-                    showUserReadyToConnect();
-                }
-            } catch (error) {
-                showError('Erro ao verificar status do WhatsApp');
-            }
-        }
-        
-        function startUserQRPolling() {
-            setInterval(checkUserBotStatus, 3000);
-        }
-        
-        function showUserLoadingState() {
-            document.getElementById('qrCode').innerHTML = `
-                <div style="text-align: center; padding: 20px;">
-                    <p>🔄 Iniciando seu WhatsApp...</p>
-                    <div class="loading-spinner"></div>
-                    <p><small>Preparando conexão pessoal</small></p>
-                </div>
-            `;
-        }
-        
-        function showUserWaitingState() {
-            document.getElementById('qrCode').innerHTML = `
-                <div style="text-align: center; padding: 20px;">
-                    <p>⏳ Gerando seu QR Code pessoal...</p>
-                    <div class="loading-spinner"></div>
-                    <p><small>Aguarde alguns segundos</small></p>
-                </div>
-            `;
-        }
-        
-        function showUserReadyToConnect() {
-            document.getElementById('qrCode').innerHTML = `
-                <div style="text-align: center; padding: 20px;">
-                    <p>📱 Conecte seu WhatsApp</p>
-                    <p><small>Clique em "Gerar QR Code" para conectar sua conta pessoal do WhatsApp</small></p>
-                    <button onclick="initializeUserWhatsAppBot()" style="margin-top: 15px;">
-                        🔗 Gerar Meu QR Code
-                    </button>
-                </div>
-            `;
-        }
-        
-        function displayUserQRCode(qrCode) {
-            // You might want to use a QR code library to display the actual QR
-            // For now, we'll show instructions
-            document.getElementById('qrCode').innerHTML = `
-                <div style="text-align: center; padding: 20px;">
-                    <p>📱 Conecte SEU WhatsApp</p>
-                    <div style="background: white; padding: 20px; display: inline-block; margin: 10px 0;">
-                        <p><strong>QR Code Gerado!</strong></p>
-                        <p><small>O QR code está disponível no servidor</small></p>
-                        <div class="loading-spinner" style="margin: 10px auto;"></div>
-                    </div>
-                    <p><strong>Como conectar:</strong></p>
-                    <ol style="text-align: left; display: inline-block;">
-                        <li>Abra o WhatsApp no seu celular</li>
-                        <li>Toque em <strong>Configurações</strong> → <strong>Dispositivos vinculados</strong></li>
-                        <li>Toque em <strong>Vincular um dispositivo</strong></li>
-                        <li>Aponte a câmera para o QR Code</li>
-                    </ol>
-                    <p><small><em>Esta conexão é pessoal e segura para sua conta</em></small></p>
-                </div>
-            `;
-        }
-        
-        // Update the user info display
-        function updateUserInfo() {
-            document.getElementById('userEmail').textContent = userEmail;
-            document.getElementById('whatsappStatus').textContent = '❌ Não conectado';
-            document.getElementById('whatsappStatus').className = 'status-disconnected';
-        }
-        
-        // Initialize when page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            updateUserInfo();
-            checkUserBotStatus();
-        });
     </script>
 </body>
 </html>

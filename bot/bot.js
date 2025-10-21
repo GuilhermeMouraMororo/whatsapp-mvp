@@ -2,35 +2,36 @@ const { Client, RemoteAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
+const { MongoStore } = require('wwebjs-mongo');
+const mongoose = require('mongoose');
 
 class WhatsAppBotManager {
     constructor() {
-        this.userClients = new Map(); // user_id -> WhatsApp client
+        this.userClients = new Map();
         this.flaskBaseUrl = process.env.FLASK_URL || 'http://localhost:5000';
+        this.setupMongoDB();
+    }
+
+    async setupMongoDB() {
+        // Use your Render PostgreSQL connection string
+        const mongoUrl = process.env.MONGODB_URI || 'mongodb://localhost:27017/whatsapp';
+        await mongoose.connect(mongoUrl);
     }
 
     async initializeUserClient(userId) {
-        try {
-            // Check if user already has a WhatsApp session
-            const response = await axios.get(`${this.flaskBaseUrl}/get_whatsapp_session?user_id=${userId}`);
-            
-            if (response.data.session && response.data.session.ready) {
-                console.log(`User ${userId} already has WhatsApp session`);
-                return true;
+        const store = new MongoStore({ mongoose: mongoose });
+        
+        const client = new Client({
+            authStrategy: new RemoteAuth({
+                store: store,
+                backupSyncIntervalMs: 300000,
+                clientId: `user-${userId}`
+            }),
+            puppeteer: {
+                headless: true,
+                args: ['--no-sandbox', '--disable-setuid-sandbox']
             }
-
-            // Use RemoteAuth instead of LocalAuth
-            const client = new Client({
-                authStrategy: new RemoteAuth({
-                    store: store, // You'll need to set this up
-                    backupSyncIntervalMs: 300000,
-                    clientId: `user-${userId}`
-                }),
-                puppeteer: {
-                    headless: true,
-                    args: ['--no-sandbox', '--disable-setuid-sandbox']
-                }
-            });
+        });
 
             // Set up event handlers for this user's client
             client.on('qr', async (qr) => {

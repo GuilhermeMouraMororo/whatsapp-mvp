@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: whatsapp-mvp
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: whatsapp-mvp-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+
+databases:
+  - name: whatsapp-mvp-db
+    plan: free
+    databaseName: whatsapp_mvp
+    user: whatsapp_user

@@ -1166,17 +1166,6 @@ def logout():
 
 @app.route('/init_whatsapp_bot', methods=['POST'])
 def init_whatsapp_bot():
-    """Initialize WhatsApp bot for user"""
-    if 'user_id' not in session:
-        return jsonify({'error': 'Not logged in'})
-    
-    user_id = session['user_id']
-    # This would trigger your Node.js bot to initialize for this user
-    # For now, we'll just return success
-    return jsonify({'success': True, 'message': 'WhatsApp bot initialization triggered'})
-
-@app.route('/init_whatsapp_bot', methods=['POST'])
-def init_whatsapp_bot():
     """Initialize WhatsApp bot for user and get QR code"""
     if 'user_id' not in session:
         return jsonify({'error': 'Not logged in'})

@@ -1233,56 +1233,94 @@ def whatsapp_status():
         'status': 'connected' if user_data and user_data['whatsapp_ready'] else 'disconnected'
     })
 
-@app.route('/api/qr_code', methods=['POST'])
-def handle_qr_code():
-    """Store QR code from Node.js bot"""
+@app.route('/api/init_user_bot', methods=['POST'])
+def init_user_bot():
+    """Initialize WhatsApp bot for a specific user"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not logged in'})
+    
+    user_id = session['user_id']
+    
+    try:
+        # Call Node.js service to initialize bot for this user
+        bot_service_url = os.environ.get('NODE_SERVICE_URL', 'http://localhost:3000')
+        response = requests.post(f'{bot_service_url}/init_user', json={
+            'user_id': user_id
+        }, timeout=30)
+        
+        if response.status_code == 200:
+            return jsonify({
+                'success': True, 
+                'message': 'WhatsApp bot initialization started for your account'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Bot service unavailable'
+            })
+            
+    except requests.exceptions.RequestException as e:
+        return jsonify({
+            'success': False,
+            'error': f'Cannot connect to WhatsApp bot service: {str(e)}'
+        })
+
+@app.route('/api/user_qr_code', methods=['POST'])
+def handle_user_qr_code():
+    """Store QR code for a specific user"""
     try:
         data = request.json
+        user_id = data.get('user_id')
         qr_code = data.get('qr_code')
         
-        # Store QR code in database or global variable
-        # For now, we'll store it in a global variable
-        global current_qr_code
-        current_qr_code = qr_code
+        # Store QR code for this specific user
+        user_qr_codes[user_id] = {
+            'qr_code': qr_code,
+            'timestamp': data.get('timestamp')
+        }
         
-        print("✅ QR Code received from Node.js bot")
+        print(f"✅ QR Code received for user {user_id}")
         return jsonify({'success': True})
         
     except Exception as e:
-        print(f"Error handling QR code: {e}")
+        print(f"Error handling user QR code: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
-@app.route('/api/whatsapp_status', methods=['POST'])
-def handle_whatsapp_status():
-    """Update WhatsApp connection status"""
+@app.route('/api/user_whatsapp_status', methods=['POST'])
+def handle_user_whatsapp_status():
+    """Update WhatsApp connection status for a specific user"""
     try:
         data = request.json
+        user_id = data.get('user_id')
         connected = data.get('connected', False)
         
-        # Update status in database
-        if 'user_id' in session:
-            db.update_whatsapp_status(session['user_id'], connected)
+        # Update status in database for this user
+        db.update_whatsapp_status(user_id, connected)
         
-        print(f"📱 WhatsApp Status: {'Connected' if connected else 'Disconnected'}")
+        # Clear QR code if connected
+        if connected and user_id in user_qr_codes:
+            del user_qr_codes[user_id]
+        
+        print(f"📱 WhatsApp Status for user {user_id}: {'Connected' if connected else 'Disconnected'}")
         return jsonify({'success': True})
         
     except Exception as e:
-        print(f"Error updating status: {e}")
+        print(f"Error updating user status: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
-@app.route('/api/whatsapp_webhook', methods=['POST'])
-def handle_whatsapp_webhook():
-    """Process incoming WhatsApp messages"""
+@app.route('/api/user_whatsapp_webhook', methods=['POST'])
+def handle_user_whatsapp_webhook():
+    """Process incoming WhatsApp messages for a specific user"""
     try:
         data = request.json
-        user_phone = data.get('from')
+        user_id = data.get('user_id')  # The business user who owns this WhatsApp
+        customer_phone = data.get('from')  # The customer's phone number
         message = data.get('message')
         
-        print(f"📩 WhatsApp message from {user_phone}: {message}")
+        print(f"📩 WhatsApp message for business user {user_id} from {customer_phone}: {message}")
         
-        # Process the message using your existing order system
-        # This is where you integrate with your order processing logic
-        response_message = process_whatsapp_message(user_phone, message)
+        # Process the message using the specific user's order system
+        response_message = process_user_whatsapp_message(user_id, customer_phone, message)
         
         return jsonify({
             'success': True,
@@ -1290,28 +1328,51 @@ def handle_whatsapp_webhook():
         })
         
     except Exception as e:
-        print(f"Error processing WhatsApp message: {e}")
+        print(f"Error processing user WhatsApp message: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
-@app.route('/api/bot_status')
-def get_bot_status():
-    """Get current bot status for frontend"""
+@app.route('/api/user_bot_status')
+def get_user_bot_status():
+    """Get current bot status for the logged-in user"""
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not logged in'})
+    
+    user_id = session['user_id']
+    
     try:
-        # Check if Node.js service is running
-        bot_status = {
-            'service_running': True,  # You might want to actually check this
-            'has_qr': hasattr(global_current_qr, 'current_qr_code') and global_current_qr.current_qr_code is not None,
-            'connected': False
+        # Get user data from database
+        user_data = db.get_user(user_id)
+        
+        # Check if user has QR code waiting
+        has_qr = user_id in user_qr_codes
+        
+        status = {
+            'connected': user_data['whatsapp_ready'] if user_data else False,
+            'has_qr': has_qr,
+            'qr_code': user_qr_codes.get(user_id, {}).get('qr_code') if has_qr else None,
+            'service_running': True
         }
         
-        if 'user_id' in session:
-            user_data = db.get_user(session['user_id'])
-            bot_status['connected'] = user_data['whatsapp_ready'] if user_data else False
-        
-        return jsonify(bot_status)
+        return jsonify(status)
         
     except Exception as e:
         return jsonify({'service_running': False, 'error': str(e)})
+
+def process_user_whatsapp_message(user_id, customer_phone, message):
+    """Process incoming WhatsApp messages for a specific business user"""
+    # Integrate with your existing order system for this specific user
+    message_lower = message.lower().strip()
+    
+    # Get the user's session and process the order
+    user_session = get_user_session(user_id, None)  # Your existing function
+    
+    # Process the message using your existing order system
+    result = user_session.process_message(message)
+    
+    if result.get('message'):
+        return result['message']
+    else:
+        return "Mensagem recebida! Processando seu pedido..."
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

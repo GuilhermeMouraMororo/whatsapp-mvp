@@ -1,4 +1,4 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, RemoteAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
@@ -19,11 +19,12 @@ class WhatsAppBotManager {
                 return true;
             }
 
-            // Create new WhatsApp client for this user
-            const clientId = `user-${userId}`;
+            // Use RemoteAuth instead of LocalAuth
             const client = new Client({
-                authStrategy: new LocalAuth({
-                    clientId: clientId
+                authStrategy: new RemoteAuth({
+                    store: store, // You'll need to set this up
+                    backupSyncIntervalMs: 300000,
+                    clientId: `user-${userId}`
                 }),
                 puppeteer: {
                     headless: true,
@@ -65,6 +66,14 @@ class WhatsAppBotManager {
             client.on('disconnected', (reason) => {
                 console.log(`Client disconnected for user ${userId}:`, reason);
                 this.userClients.delete(userId);
+            });
+
+            client.on('remote_session_saved', async () => {
+                console.log(`Remote session saved for user ${userId}`);
+                await axios.post(`${this.flaskBaseUrl}/save_whatsapp_session`, {
+                    user_id: userId,
+                    ready: true
+                });
             });
 
             // Store client and initialize

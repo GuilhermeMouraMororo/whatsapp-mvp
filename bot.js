@@ -1,160 +1,183 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const axios = require('axios');
-const { v4: uuidv4 } = require('uuid');
 
-class WhatsAppBotManager {
+// Simple configuration
+const config = {
+    flaskUrl: process.env.FLASK_URL || 'http://localhost:5000',
+    adminPhone: process.env.ADMIN_PHONE || null // Optional: for sending status updates
+};
+
+class SimpleWhatsAppBot {
     constructor() {
-        this.userClients = new Map(); // user_id -> WhatsApp client
-        this.flaskBaseUrl = process.env.FLASK_URL || 'http://localhost:5000';
+        this.client = null;
+        this.isConnected = false;
+        this.currentQR = null;
+        this.init();
     }
 
-    async initializeUserClient(userId) {
-        try {
-            // Check if user already has a WhatsApp session
-            const response = await axios.get(`${this.flaskBaseUrl}/get_whatsapp_session?user_id=${userId}`);
+    init() {
+        console.log('🚀 Starting WhatsApp Bot...');
+        
+        this.client = new Client({
+            authStrategy: new LocalAuth({
+                clientId: "whatsapp-bot"
+            }),
+            puppeteer: {
+                headless: true,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage'
+                ]
+            }
+        });
+
+        this.setupEventHandlers();
+        this.client.initialize();
+    }
+
+    setupEventHandlers() {
+        // QR Code Event
+        this.client.on('qr', (qr) => {
+            console.log('📱 QR Code Received!');
+            this.currentQR = qr;
             
-            if (response.data.session && response.data.session.ready) {
-                console.log(`User ${userId} already has WhatsApp session`);
-                return true;
-            }
+            // Display in terminal
+            qrcode.generate(qr, { small: true });
+            
+            // Send to Flask app
+            this.sendQRToFlask(qr);
+        });
 
-            // Create new WhatsApp client for this user
-            const clientId = `user-${userId}`;
-            const client = new Client({
-                authStrategy: new LocalAuth({
-                    clientId: clientId
-                }),
-                puppeteer: {
-                    headless: true,
-                    args: ['--no-sandbox', '--disable-setuid-sandbox']
-                }
+        // Ready Event
+        this.client.on('ready', () => {
+            console.log('✅ WhatsApp Client is Ready!');
+            this.isConnected = true;
+            this.currentQR = null;
+            this.updateFlaskStatus(true);
+        });
+
+        // Message Event
+        this.client.on('message', async (message) => {
+            await this.handleIncomingMessage(message);
+        });
+
+        // Authentication Events
+        this.client.on('authenticated', () => {
+            console.log('🔐 Authenticated Successfully!');
+        });
+
+        this.client.on('auth_failure', (msg) => {
+            console.error('❌ Authentication Failed:', msg);
+            this.updateFlaskStatus(false);
+        });
+
+        this.client.on('disconnected', (reason) => {
+            console.log('🔌 Disconnected:', reason);
+            this.isConnected = false;
+            this.updateFlaskStatus(false);
+        });
+    }
+
+    async sendQRToFlask(qr) {
+        try {
+            await axios.post(`${config.flaskUrl}/api/qr_code`, {
+                qr_code: qr,
+                timestamp: new Date().toISOString()
             });
-
-            // Set up event handlers for this user's client
-            client.on('qr', async (qr) => {
-                console.log(`QR for user ${userId}:`);
-                qrcode.generate(qr, { small: true });
-                
-                // Send QR code to Flask app to display to user
-                await axios.post(`${this.flaskBaseUrl}/qr_code`, {
-                    user_id: userId,
-                    qr_code: qr
-                });
-            });
-
-            client.on('ready', async () => {
-                console.log(`WhatsApp client ready for user ${userId}`);
-                
-                // Mark user's WhatsApp as ready
-                await axios.post(`${this.flaskBaseUrl}/save_whatsapp_session`, {
-                    user_id: userId,
-                    client_id: clientId,
-                    ready: true
-                });
-            });
-
-            client.on('message', async (message) => {
-                await this.handleUserMessage(userId, message);
-            });
-
-            client.on('auth_failure', (msg) => {
-                console.error(`Auth failure for user ${userId}:`, msg);
-            });
-
-            client.on('disconnected', (reason) => {
-                console.log(`Client disconnected for user ${userId}:`, reason);
-                this.userClients.delete(userId);
-            });
-
-            // Store client and initialize
-            this.userClients.set(userId, client);
-            await client.initialize();
-
-            return false; // New session created
-
+            console.log('📨 QR Code sent to Flask app');
         } catch (error) {
-            console.error(`Error initializing user ${userId}:`, error);
-            throw error;
+            console.error('❌ Failed to send QR to Flask:', error.message);
         }
     }
 
-    async handleUserMessage(userId, message) {
+    async updateFlaskStatus(connected) {
         try {
-            // Ignore group messages and status messages
-            if (message.from === 'status@broadcast' || message.fromMe || message.isGroup) {
-                return;
-            }
+            await axios.post(`${config.flaskUrl}/api/whatsapp_status`, {
+                connected: connected,
+                timestamp: new Date().toISOString()
+            });
+            console.log(`📊 Status updated: ${connected ? 'Connected' : 'Disconnected'}`);
+        } catch (error) {
+            console.error('❌ Failed to update status:', error.message);
+        }
+    }
 
-            const messageBody = message.body;
-            console.log(`Message from user ${userId}: ${messageBody}`);
+    async handleIncomingMessage(message) {
+        // Skip group messages and status messages
+        if (message.from === 'status@broadcast' || message.isGroup) {
+            return;
+        }
 
-            // Send message to Flask app for processing
-            const response = await axios.post(`${this.flaskBaseUrl}/send_message`, {
-                message: messageBody,
-                session_id: userId, // Use user_id as session_id
-                user_id: userId
+        console.log(`📩 New message from ${message.from}: ${message.body}`);
+
+        try {
+            // Send message to Flask for processing
+            const response = await axios.post(`${config.flaskUrl}/api/whatsapp_webhook`, {
+                from: message.from,
+                message: message.body,
+                timestamp: new Date().toISOString()
             });
 
-            // Send response back via WhatsApp
-            if (response.data && response.data.bot_message) {
-                await this.userClients.get(userId).sendMessage(message.from, response.data.bot_message);
+            // Send response back to user
+            if (response.data && response.data.reply) {
+                await message.reply(response.data.reply);
             }
 
         } catch (error) {
-            console.error(`Error handling message for user ${userId}:`, error);
+            console.error('❌ Error processing message:', error.message);
+            
+            // Send error message to user
+            try {
+                await message.reply('❌ Desculpe, ocorreu um erro. Tente novamente em alguns instantes.');
+            } catch (e) {
+                console.error('Failed to send error message:', e.message);
+            }
         }
     }
 
-    async sendMessageToUser(userId, recipientNumber, message) {
-        try {
-            const client = this.userClients.get(userId);
-            if (client) {
-                const chatId = `${recipientNumber}@c.us`;
-                await client.sendMessage(chatId, message);
-                return true;
-            }
-            return false;
-        } catch (error) {
-            console.error(`Error sending message for user ${userId}:`, error);
-            return false;
+    // Method to send messages (for your order system)
+    async sendMessage(phoneNumber, message) {
+        if (!this.isConnected) {
+            throw new Error('WhatsApp client is not connected');
         }
-    }
 
-    getUserClientStatus(userId) {
-        const client = this.userClients.get(userId);
-        return client ? 'connected' : 'disconnected';
-    }
-
-    async logoutUser(userId) {
         try {
-            const client = this.userClients.get(userId);
-            if (client) {
-                await client.destroy();
-                this.userClients.delete(userId);
-                
-                // Update database
-                await axios.post(`${this.flaskBaseUrl}/save_whatsapp_session`, {
-                    user_id: userId,
-                    ready: false
-                });
-            }
+            const chatId = phoneNumber.includes('@c.us') ? phoneNumber : `${phoneNumber}@c.us`;
+            await this.client.sendMessage(chatId, message);
+            console.log(`✅ Message sent to ${phoneNumber}`);
             return true;
         } catch (error) {
-            console.error(`Error logging out user ${userId}:`, error);
+            console.error('❌ Failed to send message:', error.message);
             return false;
         }
     }
+
+    // Get current status
+    getStatus() {
+        return {
+            connected: this.isConnected,
+            hasQR: this.currentQR !== null,
+            qrCode: this.currentQR
+        };
+    }
 }
 
-// Create and export singleton instance
-const botManager = new WhatsAppBotManager();
-module.exports = botManager;
+// Create and export the bot instance
+const whatsappBot = new SimpleWhatsAppBot();
 
-// Start the bot manager if this file is run directly
-if (require.main === module) {
-    console.log('🤖 Starting WhatsApp Bot Manager...');
-    
-    // This would typically be called by your web interface
-    // when a user needs their WhatsApp client initialized
-}
+// Handle process events
+process.on('SIGINT', async () => {
+    console.log('🛑 Shutting down WhatsApp bot...');
+    if (whatsappBot.client) {
+        await whatsappBot.client.destroy();
+    }
+    process.exit(0);
+});
+
+process.on('unhandledRejection', (error) => {
+    console.error('Unhandled Promise Rejection:', error);
+});
+
+module.exports = whatsappBot;

@@ -2,8 +2,12 @@ services:
   - type: web
     name: whatsapp-mvp
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python app.py
+    buildCommand: |
+      pip install -r requirements.txt
+      cd bot && npm install
+    startCommand: |
+      python app.py &
+      cd bot && node bot.js
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -11,9 +15,13 @@ services:
           property: connectionString
       - key: SECRET_KEY
         generateValue: true
+      - key: FLASK_URL
+        value: http://localhost:5000
+      - key: MONGODB_URI
+        value: mongodb://localhost:27017/whatsapp
 
 databases:
   - name: whatsapp-mvp-db
-    plan: free
+    plan: starter
     databaseName: whatsapp_mvp
     user: whatsapp_user

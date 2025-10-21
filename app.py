@@ -22,6 +22,10 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
 # Initialize database
 db = Database()
 
+user_qr_codes = {}
+user_sessions = {}
+session_lock = threading.Lock()
+
 # --------- Database setup (PostgreSQL for production) ----------
 def get_db_connection():
     """Get database connection for existing order processing functions"""
